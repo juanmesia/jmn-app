@@ -1,4 +1,4 @@
-const CACHE = "jmn-app-v1";
+const CACHE = "jmn-premium-v3";
 const ASSETS = ["./","./index.html"];
 
 self.addEventListener("install", e => {
