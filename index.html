@@ -1,22 +1,3 @@
-<!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#0f1115" />
-  <title>JMNail Calculadora</title>
-
-  <!-- PWA -->
-  <link rel="manifest" href="manifest.webmanifest" />
-
-  <!-- Fuente -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
-</head>
-
-<body style="margin:0;background:#0b0b0b;">
-
 <div class="jmn-calculadora">
 
   <div class="jmn-top">
@@ -49,7 +30,7 @@
       <label>Costo de material gastado por servicio</label>
       <input id="material" type="text" inputmode="decimal" placeholder="Ej: 5.80 o 5,80">
 
-      <!-- MERMA -->
+      <!-- NUEVO: MERMA 5% - 10% -->
       <div class="jmn-merma">
         <div class="jmn-merma-top">
           <label style="margin:0;">Merma de material (5% a 10%)</label>
@@ -153,6 +134,29 @@
 
       <label>Ganancia deseada (%)</label>
       <input id="ganancia" type="text" inputmode="decimal" value="30" placeholder="Ej: 30">
+
+      <label>Modo de ganancia</label>
+
+      <!-- ✅ SELECT (se mantiene) -->
+      <select id="gananciaModo" style="width:100%;display:block;box-sizing:border-box;padding:12px 14px;background: rgba(17,17,17,.92);border:1px solid rgba(255,255,255,.12);border-radius:12px;color:#fff;font-size:15px;outline:none;appearance:none;transition:.2s ease;">
+        <option value="markup" selected>Markup (sobre costo)</option>
+        <option value="margin">Margen (sobre precio)</option>
+      </select>
+
+      <!-- ✅ Indicador visual / selector -->
+      <div class="jmn-modebar" style="display:flex;gap:10px;margin-top:10px;">
+        <button type="button" class="jmn-modebtn" data-mode="markup"
+          style="flex:1;padding:12px 12px;border-radius:999px;border:1px solid rgba(255,215,0,.18);background:rgba(255,255,255,.04);color:rgba(255,255,255,.9);font-weight:900;letter-spacing:.4px;text-transform:uppercase;cursor:pointer;">
+          ✅ Markup
+        </button>
+
+        <button type="button" class="jmn-modebtn" data-mode="margin"
+          style="flex:1;padding:12px 12px;border-radius:999px;border:1px solid rgba(255,215,0,.18);background:rgba(255,255,255,.04);color:rgba(255,255,255,.9);font-weight:900;letter-spacing:.4px;text-transform:uppercase;cursor:pointer;">
+          Margen
+        </button>
+      </div>
+
+      <div class="jmn-mini" id="gananciaLegend">30% markup = 23.08% margin</div>
 
       <button class="jmn-btn" onclick="calcularGeneral()">
         <span>Calcular precio final</span><i class="jmn-arrow">→</i>
@@ -395,7 +399,7 @@ input:focus{
   background: rgba(0,0,0,.18);
   color: rgba(255,255,255,.85);
 }
-/* ===== BARRA DE MERMA ===== */
+/* ===== BARRA DE MERMA (LINEA DESLIZABLE) ===== */
 .jmn-range{
   -webkit-appearance:none;
   appearance:none;
@@ -406,6 +410,8 @@ input:focus{
   margin-top:8px;
   cursor:pointer;
 }
+
+/* línea */
 .jmn-range::-webkit-slider-runnable-track{
   height:6px;
   border-radius:999px;
@@ -416,6 +422,8 @@ input:focus{
   border-radius:999px;
   background:linear-gradient(90deg,#c9a227,#f5e6a3);
 }
+
+/* punto deslizante */
 .jmn-range::-webkit-slider-thumb{
   -webkit-appearance:none;
   width:18px;
@@ -444,74 +452,114 @@ input:focus{
   .jmn-calculadora h2{ font-size:20px; }
   .subtitle{ font-size:13px; }
 }
-  .jmn-video-wrapper{
-  margin:25px 0 30px;
-}
-
-.jmn-video{
-  position:relative;
-  padding-bottom:56.25%;
-  height:0;
-  overflow:hidden;
-  border-radius:18px;
-  box-shadow:0 25px 70px rgba(0,0,0,.65);
-  border:1px solid rgba(255,215,0,.15);
-}
-.jmn-video-wrapper{
-  margin:25px 0 30px;
-}
-
-.jmn-video{
-  position:relative;
-  padding-bottom:56.25%;
-  height:0;
-  overflow:hidden;
-  border-radius:18px;
-  box-shadow:0 25px 70px rgba(0,0,0,.65);
-  border:1px solid rgba(255,215,0,.15);
-}
 </style>
 
 <script>
 function money(v){
   return "$" + (Math.round((v + Number.EPSILON)*100)/100).toFixed(2);
 }
+
+/* Permite coma o punto, y también tolera símbolos ($, espacios) */
 function parseFlexNumber(value){
-  const s = (value ?? "").toString().trim().replace(/\s/g,"").replace(/\$/g,"").replace(/,/g,".");
+  const s = (value ?? "").toString()
+    .trim()
+    .replace(/\s/g,"")
+    .replace(/\$/g,"")
+    .replace(/,/g,".");
   const n = parseFloat(s);
   return Number.isFinite(n) ? n : 0;
 }
-function safeNum(id){ return parseFlexNumber(document.getElementById(id)?.value); }
+
+function safeNum(id){
+  return parseFlexNumber(document.getElementById(id)?.value);
+}
+
 function safeInt(id, min=1){
   const n = Math.round(safeNum(id));
   return Math.max(min, Number.isFinite(n) ? n : min);
 }
+
 function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
-function getMermaPct(){ return clamp(safeNum("merma") || 8, 5, 10); }
+
+function getMermaPct(){
+  const raw = safeNum("merma") || 8;
+  return clamp(raw, 5, 10);
+}
+
+/* ✅ clamp % ganancia */
+function getGanPct(){
+  const raw = safeNum("ganancia");
+  return clamp(raw, 0, 95);
+}
+
+/* ✅ modo de ganancia */
+function getGanMode(){
+  const el = document.getElementById("gananciaModo");
+  return (el && el.value) ? el.value : "markup";
+}
+
+/* ✅ leyenda dinámica */
+function updateGananciaLegend(){
+  const pct = getGanPct()/100;
+  const mode = getGanMode();
+  const out = document.getElementById("gananciaLegend");
+  if(!out) return;
+
+  let t = "";
+  if(mode === "margin"){
+    const markupEq = pct / Math.max(0.000001, (1 - pct));
+    t = `${getGanPct().toFixed(1)}% margen = ${(markupEq*100).toFixed(2)}% markup`;
+  }else{
+    const marginEq = pct / (1 + pct);
+    t = `${getGanPct().toFixed(1)}% markup = ${(marginEq*100).toFixed(2)}% margin`;
+  }
+  out.textContent = t;
+}
+
+/* ✅ selector visual (píldoras) */
+function setModeUI(mode){
+  const btns = document.querySelectorAll(".jmn-modebtn");
+  btns.forEach(b=>{
+    const isOn = (b.dataset.mode === mode);
+    b.style.background = isOn ? "linear-gradient(90deg,#c9a227,#f5e6a3)" : "rgba(255,255,255,.04)";
+    b.style.color = isOn ? "#0b0b0b" : "rgba(255,255,255,.9)";
+    b.style.borderColor = isOn ? "rgba(245,230,163,.55)" : "rgba(255,215,0,.18)";
+    b.textContent = isOn ? ("✅ " + (mode === "markup" ? "Markup" : "Margen")) : (b.dataset.mode === "markup" ? "Markup" : "Margen");
+  });
+}
 
 function updateSubtotals(){
+  // Merma UI
   const mermaPct = getMermaPct();
   const mermaVal = document.getElementById("mermaVal");
   if(mermaVal) mermaVal.textContent = mermaPct.toString();
 
+  // Material + merma
   const materialBase = safeNum("material");
   const materialAdj = materialBase * (1 + mermaPct/100);
   document.getElementById("materialOut").innerText = money(materialAdj);
 
+  // Mano de obra
   const tiempo = safeNum("tiempo");
   const hora = safeNum("hora");
   const mano = (tiempo/60) * hora;
   document.getElementById("manoOut").innerText = money(mano);
 
+  // Fijos por cliente
   const fijos = safeNum("fijos");
   const serv1 = safeInt("servicios", 1);
   const fijosCliente = fijos / serv1;
   document.getElementById("fijosOut").innerText = money(fijosCliente);
 
+  // Depreciación por cliente
   const dep = safeNum("depreciacion");
   const serv2 = safeInt("servicios2", 1);
   const depCliente = dep / serv2;
   document.getElementById("depOut").innerText = money(depCliente);
+
+  // ✅ actualiza leyenda + UI
+  updateGananciaLegend();
+  setModeUI(getGanMode());
 }
 
 function calcularGeneral(){
@@ -535,10 +583,20 @@ function calcularGeneral(){
   const serv2 = safeInt("servicios2", 1);
   const depCliente = dep / serv2;
 
-  const ganPct = safeNum("ganancia");
+  const ganPct = getGanPct();
+  const ganMode = getGanMode();
 
   const costo = materialAdj + mano + fijosCliente + depCliente;
-  const precio = costo * (1 + ganPct/100);
+
+  // ✅ Markup vs Margin
+  let precio = 0;
+  if(ganMode === "margin"){
+    const den = Math.max(0.000001, (1 - ganPct/100));
+    precio = costo / den;
+  }else{
+    precio = costo * (1 + ganPct/100);
+  }
+
   const profit = precio - costo;
   const margen = (precio > 0) ? (profit / precio) * 100 : 0;
 
@@ -546,6 +604,7 @@ function calcularGeneral(){
   document.getElementById("precio").innerText = money(precio);
   document.getElementById("profit").innerText = money(profit);
   document.getElementById("margen").innerText = margen.toFixed(1) + "%";
+
   document.getElementById("kpis").style.display = "grid";
 
   const msg = [];
@@ -558,7 +617,21 @@ function calcularGeneral(){
     ? title + "Nota: " + msg.join(" ")
     : title + "Cálculo completo. Ya tienes un precio basado en costos reales.";
 
-  window.__jmn_last = { nombre, materialBase, mermaPct, materialAdj, mano, fijosCliente, depCliente, ganPct, costo, precio, profit, margen };
+  window.__jmn_last = {
+    nombre,
+    materialBase,
+    mermaPct,
+    materialAdj,
+    mano,
+    fijosCliente,
+    depCliente,
+    ganPct,
+    ganMode,
+    costo,
+    precio,
+    profit,
+    margen
+  };
 }
 
 async function copiarResumen(){
@@ -567,6 +640,10 @@ async function copiarResumen(){
   if(!d) return;
 
   const name = d.nombre ? `SERVICIO: ${d.nombre}\n` : "";
+  const ganTxt = (d.ganMode === "margin")
+    ? `GANANCIA (MARGEN SOBRE PRECIO): ${d.ganPct.toFixed(1)}%`
+    : `GANANCIA (MARKUP SOBRE COSTO): ${d.ganPct.toFixed(1)}%`;
+
   const text =
 `${name}RESUMEN DE COSTOS (por servicio)
 - Material (base): ${money(d.materialBase)}
@@ -578,10 +655,10 @@ async function copiarResumen(){
 - Depreciación por cliente: ${money(d.depCliente)}
 
 COSTO UNITARIO: ${money(d.costo)}
-GANANCIA DESEADA: ${d.ganPct.toFixed(1)}%
+${ganTxt}
 PRECIO SUGERIDO: ${money(d.precio)}
 GANANCIA: ${money(d.profit)}
-MARGEN: ${d.margen.toFixed(1)}%`;
+MARGEN REAL: ${d.margen.toFixed(1)}%`;
 
   try{
     await navigator.clipboard.writeText(text);
@@ -597,24 +674,31 @@ MARGEN: ${d.margen.toFixed(1)}%`;
   }
 }
 
-["material","tiempo","hora","fijos","servicios","depreciacion","servicios2","merma"].forEach(id=>{
+/* Listeners */
+["material","tiempo","hora","fijos","servicios","depreciacion","servicios2","merma","ganancia"].forEach(id=>{
   const el = document.getElementById(id);
   if(el){
     el.addEventListener("input", updateSubtotals);
     el.addEventListener("change", updateSubtotals);
   }
 });
+
+const gm = document.getElementById("gananciaModo");
+if(gm){
+  gm.addEventListener("change", updateSubtotals);
+}
+
+// ✅ clicks del indicador visual
+document.querySelectorAll(".jmn-modebtn").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    const mode = btn.dataset.mode || "markup";
+    const sel = document.getElementById("gananciaModo");
+    if(sel) sel.value = mode;
+    setModeUI(mode);
+    updateSubtotals();
+  });
+});
+
 updateSubtotals();
+setModeUI(getGanMode());
 </script>
-
-<!-- ✅ Registro PWA -->
-<script>
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("./sw.js");
-    });
-  }
-</script>
-
-</body>
-</html>
